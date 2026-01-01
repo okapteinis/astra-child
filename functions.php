@@ -65,3 +65,94 @@ function astra_child_admin_notice() {
     }
 }
 ?>
+
+
+// ===== ChatGPT Atlas Friendly Enhancements =====
+
+// Output additional JSON-LD Product schema for single products
+add_action( 'wp_head', 'supfit_add_product_schema', 30 );
+function supfit_add_product_schema() {
+    if ( ! function_exists( 'is_product' ) || ! is_product() ) {
+        return;
+    }
+
+    global $product;
+    if ( ! $product instanceof WC_Product ) {
+        return;
+    }
+
+    $schema = array(
+        '@context'  => 'https://schema.org',
+        '@type'     => 'Product',
+        'name'      => get_the_title(),
+        'image'     => wp_get_attachment_url( $product->get_image_id() ),
+        'description' => wp_strip_all_tags( get_the_excerpt(), true ),
+        'sku'       => $product->get_sku(),
+        'offers'    => array(
+            '@type'         => 'Offer',
+            'priceCurrency' => get_woocommerce_currency(),
+            'price'         => $product->get_price(),
+            'availability'  => $product->is_in_stock()
+                ? 'https://schema.org/InStock'
+                : 'https://schema.org/OutOfStock',
+            'url'           => get_permalink(),
+        ),
+    );
+
+    echo '<script type="application/ld+json">' . wp_json_encode( $schema ) . '</script>';
+}
+
+// Improve ARIA labels for WooCommerce buttons
+add_filter( 'woocommerce_product_add_to_cart_text', 'supfit_add_to_cart_text', 10, 2 );
+function supfit_add_to_cart_text( $text, $product ) {
+    return __( 'Add to cart', 'astra-child' );
+}
+
+add_filter( 'woocommerce_product_add_to_cart_attributes', 'supfit_add_to_cart_attributes', 10, 2 );
+function supfit_add_to_cart_attributes( $attributes, $product ) {
+    $label = sprintf(
+        __( 'Add "%s" to your cart', 'astra-child' ),
+        $product->get_name()
+    );
+    $attributes['aria-label'] = esc_attr( $label );
+    return $attributes;
+}
+
+// Clarify checkout button label for Atlas
+add_filter( 'woocommerce_order_button_text', function( $text ) {
+    return __( 'Place order (secure checkout)', 'astra-child' );
+} );
+
+// Simple breadcrumb hook before main content
+add_action( 'astra_primary_content_top', 'supfit_simple_breadcrumb' );
+function supfit_simple_breadcrumb() {
+    if ( is_front_page() ) {
+        return;
+    }
+
+    echo '<nav class="supfit-breadcrumb" aria-label="Breadcrumb">';
+    echo '<a href="' . esc_url( home_url( '/' ) ) . '">Home</a>';
+
+    if ( is_shop() ) {
+        echo ' » <span>Shop</span>';
+    } elseif ( is_product_category() ) {
+        echo ' » <span>' . single_term_title( '', false ) . '</span>';
+    } elseif ( is_product() ) {
+        echo ' » <a href="' . esc_url( wc_get_page_permalink( 'shop' ) ) . '">Shop</a>';
+        $terms = wc_get_product_terms( get_the_ID(), 'product_cat' );
+        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+            echo ' » <span>' . esc_html( $terms[0]->name ) . '</span>';
+        }
+    }
+
+    echo '</nav>';
+}
+
+// Optional: Disable distractions on checkout for clearer Atlas automation
+add_action( 'wp', 'supfit_reduce_checkout_distractions' );
+function supfit_reduce_checkout_distractions() {
+    if ( is_checkout() ) {
+        // Example: dequeue marketing popup scripts or banners here.
+        // wp_dequeue_script( 'some-popup-handle' );
+    }
+}
