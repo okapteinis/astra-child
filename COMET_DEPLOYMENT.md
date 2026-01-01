@@ -88,12 +88,12 @@ After pulling the code, verify the following files exist:
 
 ```
 astra-child/
-├── style.css          # Updated with Comet widget CSS
-├── functions.php      # Enhanced with Comet integration hooks
+├── COMET_DEPLOYMENT.md    # This file
+├── functions.php          # Enhanced with Comet integration hooks
+├── style.css              # Updated with Comet widget CSS
 ├── js/
-│   └── comet-custom.js  # Custom Comet event handling
-├── screenshot.png
-└── COMET_DEPLOYMENT.md  # This file
+│   └── comet-custom.js   # Custom Comet event handling
+└── screenshot.png
 ```
 
 ### Step 6: WooCommerce Hooks

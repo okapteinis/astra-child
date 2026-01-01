@@ -9,29 +9,104 @@ function astra_child_enqueue_styles() {
     wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css');
 }
 
+// Helper function to get Comet configuration
+function astra_child_get_comet_config() {
+    return array(
+        'script_url' => get_option('astra_child_comet_script_url', 'https://comet-assistant.com/widget.js'),
+        'api_key' => get_option('astra_child_comet_api_key', ''), // Empty default, must be set in admin
+    );
+}
+
+// Optional: Add admin settings page for Comet configuration
+add_action('admin_menu', 'astra_child_comet_settings_menu');
+function astra_child_comet_settings_menu() {
+    add_theme_page(
+        'Comet Settings',
+        'Comet Settings',
+        'manage_options',
+        'astra-child-comet',
+        'astra_child_comet_settings_page'
+    );
+}
+
+function astra_child_comet_settings_page() {
+    if (isset($_POST['astra_child_comet_save'])) {
+        check_admin_referer('astra_child_comet_settings');
+        update_option('astra_child_comet_script_url', sanitize_url($_POST['comet_script_url']));
+        update_option('astra_child_comet_api_key', sanitize_text_field($_POST['comet_api_key']));
+        echo '<div class="notice notice-success"><p>Comet settings saved!</p></div>';
+    }
+
+    $config = astra_child_get_comet_config();
+    ?>
+    <div class="wrap">
+        <h1>Comet Assistant Settings</h1>
+        <form method="post">
+            <?php wp_nonce_field('astra_child_comet_settings'); ?>
+            <table class="form-table">
+                <tr>
+                    <th><label for="comet_script_url">Comet Script URL</label></th>
+                    <td>
+                        <input type="url" id="comet_script_url" name="comet_script_url"
+                               value="<?php echo esc_attr($config['script_url']); ?>"
+                               class="regular-text" />
+                        <p class="description">Full URL to Comet widget JavaScript file</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="comet_api_key">Comet API Key</label></th>
+                    <td>
+                        <input type="text" id="comet_api_key" name="comet_api_key"
+                               value="<?php echo esc_attr($config['api_key']); ?>"
+                               class="regular-text" />
+                        <p class="description">Your Comet Assistant API key</p>
+                    </td>
+                </tr>
+            </table>
+            <p><input type="submit" name="astra_child_comet_save" class="button-primary" value="Save Settings" /></p>
+        </form>
+    </div>
+    <?php
+}
+
 // Enqueue Comet Assistant
 add_action('wp_enqueue_scripts', 'enqueue_comet_assistant');
 function enqueue_comet_assistant() {
+    $config = astra_child_get_comet_config();
+
+    // Only enqueue if API key is configured
+    if (empty($config['api_key'])) {
+        // Optional: show admin notice
+        if (current_user_can('manage_options')) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-warning"><p>Comet API key not configured. <a href="' . admin_url('themes.php?page=astra-child-comet') . '">Configure now</a></p></div>';
+            });
+        }
+        return; // Don't load widget without API key
+    }
+
     // Comet JS widget
     wp_enqueue_script(
         'comet-widget',
-        'https://comet-assistant.com/widget.js', // Replace with actual Comet script URL
+        esc_url($config['script_url']),
         array(),
-        '1.0.0',
+        '1.0.1', // Increment version
         true
     );
-    
+
     // Pass data to JS (e.g., API key, user info)
     wp_localize_script('comet-widget', 'cometConfig', array(
-        'apiKey' => 'YOUR_COMET_API_KEY',
-        'siteUrl' => home_url(),
+        'apiKey' => esc_js($config['api_key']),
+        'siteUrl' => esc_url(home_url()),
         'isWooCommerce' => class_exists('WooCommerce') ? 'yes' : 'no',
     ));
 
     // Inline CSS for dynamic positioning
-    wp_add_inline_style('astra-theme-css', '
-        .comet-chat-toggle { /* Comet button styles */ }
-    ');
+    if (wp_style_is('astra-theme-css', 'enqueued')) {
+        wp_add_inline_style('astra-theme-css', '
+            .comet-chat-toggle { /* Comet button styles */ }
+        ');
+    }
 }
 
 // WooCommerce-specific Comet hooks
@@ -59,10 +134,31 @@ if (class_exists('WooCommerce')) {
 // Admin notice for activation
 add_action('admin_notices', 'astra_child_admin_notice');
 function astra_child_admin_notice() {
-    if (!get_option('astra_child_activated')) {
-        echo '<div class="notice notice-info"><p>Astra Child with Comet is ready! Test on shop pages.</p></div>';
-        update_option('astra_child_activated', true);
+    // Show notice once, then hide for 30 days
+    if (false === get_transient('astra_child_welcome_notice_dismissed')) {
+        $screen = get_current_screen();
+        // Only show on themes page for relevance
+        if ($screen && $screen->id === 'themes') {
+            ?>
+            <div class="notice notice-info is-dismissible">
+                <p><strong>Astra Child with Comet is ready!</strong> Test Comet on shop pages.
+                   <a href="<?php echo admin_url('themes.php?page=astra-child-comet'); ?>">Configure Comet settings</a>
+                </p>
+            </div>
+            <?php
+            // Auto-dismiss after showing once (transient expires in 30 days)
+            set_transient('astra_child_welcome_notice_dismissed', true, 30 * DAY_IN_SECONDS);
+        }
     }
+}
+
+// Cleanup transient on theme switch
+add_action('switch_theme', 'astra_child_cleanup_on_deactivation');
+function astra_child_cleanup_on_deactivation() {
+    delete_transient('astra_child_welcome_notice_dismissed');
+    // Optional: cleanup options too
+    delete_option('astra_child_comet_api_key');
+    delete_option('astra_child_comet_script_url');
 }
 ?>
 
