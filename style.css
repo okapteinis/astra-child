@@ -9,3 +9,22 @@ License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: astra-child
 Template: astra
 */
+
+/* Comet Assistant Styles */
+.comet-chat-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+}
+.comet-chat-widget:hover {
+    transform: scale(1.1);
+}
+.comet-chat-open {
+    width: 400px;
+    height: 500px;
+    border-radius: 10px;
+}
